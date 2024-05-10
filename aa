@@ -1,0 +1,220 @@
+package unical.informatica.demofishub;
+
+import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.concurrent.Service;
+import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
+import javafx.scene.control.skin.TableHeaderRow;
+import javafx.scene.effect.BlendMode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.*;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
+import javafx.scene.paint.Color;
+import javafx.util.Duration;
+
+import java.net.URL;
+import java.util.ResourceBundle;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class VideoView implements Initializable {
+
+    @FXML
+    private AnchorPane ancora;
+
+    @FXML
+    private MediaView mediaPlayer;
+
+    @FXML
+    private VBox vboxVideo;
+
+    @FXML
+    private HBox hboxVideo;
+
+    private String fileName = "Una Tomba Per Le Lucciole";
+
+    private MediaPlayer mediaPlayer1;
+
+    @FXML
+    private Button buttonP;
+    @FXML
+    private Pane timelinePane;
+    @FXML
+    private Slider slider;
+
+    private boolean fullscreen = false;
+
+    private  DoubleProperty width;
+    private DoubleProperty height;
+
+    @FXML
+    private BorderPane myBorederPane;
+
+    @FXML
+    private Label labelNameVideo;
+
+    private boolean playing;
+
+    @FXML
+    void playVideo(ActionEvent event) {
+        playStopFunc();
+
+    }
+
+    private void playStopFunc(){
+        if(!playing) {
+            mediaPlayer1.play();
+            playing = true;
+        } else {
+            mediaPlayer1.pause();
+            playing = false;
+        }
+    }
+
+    @FXML
+    void replayVideo(ActionEvent event) {
+        fullscreen();
+    }
+
+    private void fullscreen(){
+        if (!fullscreen) {
+            SceneHandler.getInstance().setFullScreen(true);
+            fullscreen = true;
+
+        }else {
+            SceneHandler.getInstance().setFullScreen(false);
+            fullscreen = false;
+        }
+
+    }
+
+    public void checkCursor(){
+
+        final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+        Thread thread = new Thread(new Runnable() {
+            static double x=0;
+            static double y=0;
+            static int times=0;
+            @Override
+            public void run() {
+                if(x==SceneHandler.getInstance().getMouseXpos() && y==SceneHandler.getInstance().getMouseYpos()){
+                    times+=200;
+                    System.out.println(times);
+                    if(times == 6000)
+                        setInvisible(true);
+                }else {
+                    times=0;
+                    setInvisible(false);
+                }
+
+
+                x = SceneHandler.getInstance().getMouseXpos();
+                y = SceneHandler.getInstance().getMouseYpos();
+
+            }
+        });
+        thread.setDaemon(true);
+        executorService.scheduleAtFixedRate(thread, 0, 200, TimeUnit.MILLISECONDS);
+    }
+
+    private void setInvisible(boolean b){
+        if(b){
+            SceneHandler.getInstance().checkCursor(false);
+            timelinePane.setOpacity(0);
+        }else {
+            SceneHandler.getInstance().checkCursor(true);
+            timelinePane.setOpacity(100);
+        }
+    }
+
+    @Override
+    public void initialize(URL url, ResourceBundle resourceBundle) {
+        Media media = new Media(getClass().getResource("/file/"+fileName+".mp4").toExternalForm());
+
+
+        mediaPlayer1 = new MediaPlayer(media);
+
+        mediaPlayer.setMediaPlayer(mediaPlayer1);
+
+
+
+        slider.setOnMouseDragged(e ->{
+            SceneHandler.getInstance().checkCursor(true);
+            mediaPlayer1.seek(new Duration(slider.getValue()));
+            mediaPlayer1.pause();
+        });
+
+
+        slider.setOnMouseReleased(e ->{
+            mediaPlayer1.seek(new Duration(slider.getValue()));
+        });
+
+
+        mediaPlayer1.currentTimeProperty().addListener(a ->{
+            if(mediaPlayer1.getCurrentTime().toSeconds()%1.1>1)
+                slider.setValue(mediaPlayer1.getCurrentTime().toMillis());
+        });
+
+        mediaPlayer.setOnMouseClicked(new EventHandler<MouseEvent>() {//pavone
+            @Override
+            public void handle(MouseEvent mouseEvent) {
+                if(mouseEvent.getButton().equals(MouseButton.PRIMARY)){
+                    if(mouseEvent.getClickCount() == 2){
+                        fullscreen();
+                        playStopFunc();
+                    } else if (mouseEvent.getClickCount() == 1) {
+                        playStopFunc();
+                    }
+                }
+            }
+        });
+
+        slider.prefWidthProperty().bind(Bindings.selectDouble(mediaPlayer.sceneProperty(),"width"));
+        timelinePane.prefWidthProperty().bind(Bindings.selectDouble(mediaPlayer.sceneProperty(),"width"));
+        width = mediaPlayer.fitWidthProperty();
+        height = mediaPlayer.fitHeightProperty();
+
+
+        width.bind(Bindings.selectDouble(mediaPlayer.sceneProperty(),"width"));
+        height.bind(Bindings.selectDouble(mediaPlayer.sceneProperty(),"height"));
+
+        hboxVideo.prefWidthProperty().bind(width);
+        hboxVideo.prefHeightProperty().bind(height);
+        vboxVideo.prefWidthProperty().bind(width);
+        vboxVideo.prefHeightProperty().bind(height);
+
+
+        myBorederPane.prefWidthProperty().bind(width);
+
+        mediaPlayer.setPreserveRatio(true);
+
+
+        mediaPlayer1.setOnReady(new Runnable() {
+            @Override
+            public void run() {
+                slider.setMax(mediaPlayer1.getTotalDuration().toMillis());
+                mediaPlayer1.play();
+                labelNameVideo.setText(fileName);
+            }
+        });
+        checkCursor();
+        playing = true;
+
+    }
+}
+
+
+
